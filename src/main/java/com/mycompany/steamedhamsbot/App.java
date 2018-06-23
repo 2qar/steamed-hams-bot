@@ -10,24 +10,27 @@ import net.dv8tion.jda.core.entities.MessageChannel;
 import net.dv8tion.jda.core.entities.User;
 import net.dv8tion.jda.core.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.core.hooks.ListenerAdapter;
+import net.dv8tion.jda.core.entities.Game;
+
 import java.util.Scanner;
 import java.util.ArrayList;
-import java.util.concurrent.TimeUnit;
-import net.dv8tion.jda.core.MessageBuilder;
+import javax.swing.SwingUtilities;
+import net.dv8tion.jda.core.events.channel.priv.PrivateChannelCreateEvent;
+import net.dv8tion.jda.core.events.message.priv.PrivateMessageReceivedEvent;
 
-
-// TODO: Add an alternate function that DMs users steamed hams to the user instead of just pasting it into the text channel that the command is called into
 public class App extends ListenerAdapter
 {
     static ArrayList<String> steamedHams;
+    public static JDA jda;
+    public static File[] bliniCat;
     
     public static void main(String[] args) throws Exception
     {
-        JDA jda = new JDABuilder(AccountType.BOT).setToken(Ref.TOKEN).buildBlocking();
+        jda = new JDABuilder(AccountType.BOT).setToken(Ref.TOKEN).buildBlocking();
         jda.addEventListener(new App());
+        jda.getPresence().setGame(Game.of(Game.GameType.DEFAULT, "an unforgettable luncheon"));
         
         File hamFile = new File("src/test/java/SteamedHams.txt");
-        System.out.println("Steamed Hams script available? " + hamFile.exists());
         
         steamedHams = new ArrayList<String>();
         
@@ -37,6 +40,17 @@ public class App extends ListenerAdapter
             steamedHams.add(reader.nextLine());
         
         hamsItalicizer();
+        Commands.commandsInit();
+        
+        // get all of the pictures of the blini cat
+        File bliniFolder = new File("src/main/java/com/mycompany/steamedhamsbot/blinipics");
+        bliniCat = bliniFolder.listFiles();
+        
+        // open an app window
+        AppWindow window = new AppWindow(jda);
+        SwingUtilities.invokeLater(window);
+        
+        System.out.println("STEAMED HAMS IS ONLINE");
     }
     
     private static void hamsItalicizer()
@@ -52,56 +66,48 @@ public class App extends ListenerAdapter
     @Override
     public void onMessageReceived(MessageReceivedEvent event)
     {
-        //User userObj = event.getAuthor();
+        User userObj = event.getAuthor();
         MessageChannel channelObj = event.getChannel();
         Message messageObj = event.getMessage();
+        String message = messageObj.getContentRaw();
+        boolean notBot = !userObj.isBot();
         
-        if(messageObj.getContentRaw().startsWith(Ref.PREFIX + "steamedhams"))
-        {
-            sendSteamedHams(channelObj);
-        }
+        //if(userObj.getId().equals("205541764206034944"))
+            //channelObj.sendMessage("robby smells").queue();
+        
+        // if a message has the command prefix, figure out which command to run
+        if(message.startsWith(Ref.PREFIX) && notBot)
+            Commands.runCommand(event);
+        
+        // if a message mentions steamed hams, add a steamed ham in the reactions
+        if(contains(message, new String[] { "steamed hams", "steamedhams" })
+                && notBot)
+            messageObj.addReaction("🍔").queue();
     }
     
-    private void sendSteamedHams(MessageChannel channel)
+    @Override
+    public void onPrivateChannelCreate(PrivateChannelCreateEvent event)
     {
-        for(String line : steamedHams)
-        {
-            MessageBuilder builder = new MessageBuilder();
-            builder.append("\n" + line);
-            channel.sendMessage(builder.build()).queue();
-        }
-            
+        System.out.println(event + " : event recieved");
+        //Commands.helpMessage(event);
+        event.getChannel().close().complete();
     }
     
-    /*
-    private void sendSteamedHams(MessageChannel channel)
+    
+    @Override
+    public void onPrivateMessageReceived(PrivateMessageReceivedEvent event) 
     {
-        MessageBuilder builder = new MessageBuilder();
-        builder.append("```\n");
-        
-        for(int index = 0; index < steamedHams.size(); index++)
-        {
-            String line = steamedHams.get(index);
-            int lineLength = line.length();
-            
-            // if the current message is gonna go over the character limit,
-            // send it and start a new one
-            if(builder.length() + lineLength >= 1950)
-            {
-                builder.append("```");
-                Message hamSlice = builder.build();
-                channel.sendMessage(hamSlice).queue();
-                builder = new MessageBuilder();
-                builder.append("```\n" + line);
-            }
-            else
-                builder.append(line + "\n");
-        }
-        
-        //for(String line : steamedHams)
-            //channel.sendMessage(line).complete();
+        if(!event.getAuthor().isBot())
+            Commands.helpMessage(event);
     }
-    */    
+    
+    private boolean contains(String message, String[] strings)
+    {
+        for(String string : strings)
+            if(message.toLowerCase().contains(string))
+                return true;
+        return false;
+    }
 
     private void hamsFormatter()
     {
